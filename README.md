@@ -189,7 +189,7 @@ novel-recommender/
 │   ├── novel-profile.json             偏好画像样例
 │   └── novel-candidates.json          候选书单样例
 ├── tests/
-│   └── test_rank_novels.py            33 个回归用例，标准库 unittest
+│   └── test_rank_novels.py            42 个回归用例，标准库 unittest
 ├── assets/
 │   └── demo.png                       README 用的输出截图
 └── .github/workflows/tests.yml        CI：ruff + unittest
@@ -209,7 +209,7 @@ novel-recommender/
 
 **运行要求**：Python 3.10+，**零第三方依赖**（只用标准库）。不需要 pip install 任何东西。
 
-自带 33 个回归用例，覆盖打分模型、字段校验、别名合并、主题分散和各类异常输入。要改代码、跑测试或者自己发版，看 [CONTRIBUTING.md](CONTRIBUTING.md)。
+自带 42 个回归用例，覆盖打分模型、字段校验、别名合并、主题分散、硬过滤、漏填字段提示和各类异常输入。要改代码、跑测试或者自己发版，看 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 已知局限
 

@@ -15,6 +15,9 @@
       "status": "active",
       "region": "二战德国",
       "aliases": [],
+      "sources": [
+        "https://example.com/novel/1"
+      ],
       "note": "示例数据，不代表真实评价"
     },
     {
@@ -31,7 +34,12 @@
       "credibility": "pending",
       "status": "active",
       "region": "法国大革命",
-      "aliases": ["1794"],
+      "aliases": [
+        "1794"
+      ],
+      "sources": [
+        "https://example.com/novel/2"
+      ],
       "note": "示例数据：口碑两极，争议在后期注水"
     },
     {
@@ -49,6 +57,9 @@
       "status": "active",
       "region": "日本战国",
       "aliases": [],
+      "sources": [
+        "https://example.com/novel/3"
+      ],
       "note": "示例数据：主用平台读不到，需要换平台"
     },
     {
@@ -66,6 +77,9 @@
       "status": "active",
       "region": "罗马",
       "aliases": [],
+      "sources": [
+        "https://example.com/novel/4"
+      ],
       "note": "示例数据：超出目标区间 30% 以上，会被脚本自动剔出主榜"
     },
     {
@@ -83,6 +97,9 @@
       "status": "active",
       "region": "拜占庭",
       "aliases": [],
+      "sources": [
+        "https://example.com/novel/5"
+      ],
       "note": "示例数据：平台已下架，会进延伸参考"
     }
   ]

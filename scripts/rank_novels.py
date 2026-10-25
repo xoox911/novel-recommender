@@ -43,7 +43,9 @@ LENGTH_BAND_HIGH = 1.3  # 上限 × 1.3
 
 MIN_RECOMMEND_COUNT = 10  # 低于此数量要提示回补检索
 WORD_COUNT_MAX_PLAUSIBLE = 5000  # 万字。单本网文超过这个量级基本是单位填错
-TEXT_MAX_LEN = 200  # 单字段文本上限，防脏数据
+TEXT_MAX_LEN = 200  # 书名、作者、标签、背景等短字段上限，防脏数据
+NOTE_MAX_LEN = 1000  # 备注与偏好摘要：用户原话容易被截断，单独放宽
+URL_MAX_LEN = 500  # 来源链接可能带追踪参数
 
 PLATFORM_SCORE = {"primary": 15, "secondary": 8, "none": 0}
 UPDATE_SCORE = {"exact": 5, "acceptable": 3, "mismatch": 0}
@@ -160,7 +162,7 @@ def _need_int(value, field, where, minimum=None):
     return value
 
 
-def _clean_text(value, field, where, allow_none=True):
+def _clean_text(value, field, where, allow_none=True, max_len=TEXT_MAX_LEN):
     """清理文本字段：剥控制字符、去首尾空白、限制长度。"""
     if value is None:
         if allow_none:
@@ -169,10 +171,8 @@ def _clean_text(value, field, where, allow_none=True):
     if not isinstance(value, str):
         raise InputError(f"{where}：{field} 应为字符串，实际为 {value!r}（{type(value).__name__}）")
     text = value.translate(_CONTROL_CHARS).strip()
-    if len(text) > TEXT_MAX_LEN:
-        raise InputError(
-            f"{where}：{field} 长度 {len(text)} 超过 {TEXT_MAX_LEN} 字符，疑似数据异常"
-        )
+    if len(text) > max_len:
+        raise InputError(f"{where}：{field} 长度 {len(text)} 超过 {max_len} 字符上限，请精简")
     return text
 
 
@@ -245,7 +245,7 @@ def validate_profile(raw):
         "has_reference_work": has_ref,
         "tag_denominator": denom,
         "region_cap": region_cap,
-        "note": _clean_text(raw.get("note"), "note", "profile"),
+        "note": _clean_text(raw.get("note"), "note", "profile", max_len=NOTE_MAX_LEN),
     }
 
 
@@ -348,9 +348,19 @@ def validate_candidate(idx, raw):
         if text:
             cleaned_aliases.append(text)
 
+    sources = raw.get("sources") or []
+    if not isinstance(sources, list):
+        raise InputError(f"{where}：sources 应为字符串数组，每项是一个来源页面链接")
+    cleaned_sources = []
+    for i, s in enumerate(sources):
+        text = _clean_text(s, f"sources[{i}]", where, max_len=URL_MAX_LEN)
+        if text:
+            cleaned_sources.append(text)
+
     return {
         "title": title,
         "aliases": cleaned_aliases,
+        "sources": cleaned_sources,
         "author": _clean_text(raw.get("author"), "author", where),
         "main_genre_match": main,
         "sub_tag_hits": hits,
@@ -363,7 +373,7 @@ def validate_candidate(idx, raw):
         "tag_denominator": denom,
         "status": status,
         "region": region or "",
-        "note": _clean_text(raw.get("note"), "note", where),
+        "note": _clean_text(raw.get("note"), "note", where, max_len=NOTE_MAX_LEN),
     }, warnings
 
 
@@ -486,6 +496,17 @@ def _quote_title(title):
     return title if title[:1] in "《〈「『" else f"《{title}》"
 
 
+def _norm_region(region):
+    """背景归一化，用于主题分散计数。
+
+    直接拿原始字符串当 key 时，"日本 战国" 与 "日本战国" 会被算成两个
+    不同背景，同一背景的作品就能绕开 region_cap 一起进榜。这里统一做
+    全半角折叠与空白剔除，展示用的原文仍保留。
+    """
+    text = unicodedata.normalize("NFKC", str(region))
+    return "".join(text.split()).lower()
+
+
 def dedupe_by_alias(results):
     """同一本书换了名字重复出现时，只保留分数更高的一条。
 
@@ -543,6 +564,7 @@ def diversify(results, cap):
     """主题分散：同一地理/时代背景最多保留 cap 本。
 
     被挤出的候选不丢弃，返回给调用方单列，方便用户需要时替换回来。
+    背景按 _norm_region 归一化后计数，避免写法差异绕过上限。
     """
     if not cap:
         return results, []
@@ -553,10 +575,11 @@ def diversify(results, cap):
         if not region:
             kept.append(r)
             continue
-        used = counter.get(region, 0)
+        key = _norm_region(region)
+        used = counter.get(key, 0)
         if used < cap:
             kept.append(r)
-            counter[region] = used + 1
+            counter[key] = used + 1
         else:
             held.append(r)
     return kept, held
@@ -686,6 +709,7 @@ def _result_payload(r):
         "score": r["score"],
         "breakdown": r["detail"],
         "credibility": CREDIBILITY_LABEL[r["item"]["credibility"]],
+        "sources": r["item"].get("sources") or [],
         "note": r["item"].get("note"),
     }
 
@@ -752,6 +776,34 @@ def main():
             print(f"  - {err}")
         return 2
 
+    # 字段间的漏填与自相矛盾：不阻断，但必须让执行者看见。
+    # 这三类都是"填错了也能算出一个分"的情形，静默放行会让排序失去意义。
+    if profile["has_reference_work"]:
+        missing_sim = [c for c in cleaned if c["similarity"] is None]
+        if missing_sim:
+            names = "、".join(_quote_title(c["title"]) for c in missing_sim)
+            warnings.append(
+                f"{len(missing_sim)} 部候选未填 similarity（{names}）："
+                f"has_reference_work 为 true 时该维度按 0 分计（满分 {W_SIMILARITY}），"
+                f"请补填或改画像为 has_reference_work: false"
+            )
+
+    no_sources = [c for c in cleaned if c["status"] == "active" and not c["sources"]]
+    if no_sources:
+        names = "、".join(_quote_title(c["title"]) for c in no_sources)
+        warnings.append(
+            f"{len(no_sources)} 部候选未填 sources（{names}）："
+            f"无法追溯来源页面，按规则应标「来源不明」"
+        )
+
+    for c in cleaned:
+        denom = c["tag_denominator"] or profile["tag_denominator"]
+        if denom and c["sub_tag_hits"] > denom:
+            warnings.append(
+                f"{_quote_title(c['title'])}：sub_tag_hits={c['sub_tag_hits']} 大于标签总数 "
+                f"{denom}，命中比例已按上限截断，请复核标签是否数错"
+            )
+
     if args.check:
         print(f"校验通过：{len(cleaned)} 部候选，画像无异常。")
         if warnings:
@@ -769,6 +821,9 @@ def main():
 
     results = rank(kept, profile)
     results, auto_dropped = filter_out_of_band(results)
+    # 判重必须在拆分可及性之前：否则同一本书换个写法分别落在主榜和
+    # 延伸参考里，用户会以为名单漏了书，也会看到重复的两条。
+    results, dup_alias = dedupe_by_alias(results)
     results, inaccessible = split_inaccessible(results)
     if not results:
         print(
@@ -776,7 +831,6 @@ def main():
             "请放宽字数区间，或确认候选是否全部需要切换平台/已下架。"
         )
         return 1
-    results, dup_alias = dedupe_by_alias(results)
     results, held = diversify(results, profile.get("region_cap"))
 
     if args.json:

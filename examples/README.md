@@ -18,4 +18,6 @@ python "<skill_dir>/scripts/rank_novels.py" examples/novel-candidates.json --pro
 
 末尾会出现「仅 3 部，低于 10 部下限」的警告——这是正常的，样例就五本书。真实使用时检索阶段至少要凑到 10 部。
 
+每条候选都带 `sources`（这里填的是 example.com 占位链接，真实使用时换成实际来源页面）。**不填 `sources` 的候选，`--check` 会报警，输出时按规则标「来源不明」**，这是防止"书是编的"最重要的一道闸。
+
 字段完整说明见 [../references/output-template.md](../references/output-template.md)。

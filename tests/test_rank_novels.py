@@ -467,5 +467,87 @@ class TestReputationAlias(BaseCase):
         self.assertIn("语义模糊", out)
 
 
+class TestSilentFailures(BaseCase):
+    """漏填字段与处理次序：这些情况都能"算出一个分"，但结果不可信。"""
+
+    def test_missing_similarity_warns(self):
+        """有参考作品却没填 similarity，必须提示按 0 分计。"""
+        cand = {"candidates": [_cand("甲书", sources=["https://example.com/a"])]}
+        code, out = self.run_main(cand, _profile(has_reference_work=True), "--check")
+        self.assertEqual(code, 0)
+        self.assertIn("未填 similarity", out)
+
+    def test_no_similarity_warning_without_reference(self):
+        cand = {"candidates": [_cand("甲书", sources=["https://example.com/a"])]}
+        code, out = self.run_main(cand, _profile(), "--check")
+        self.assertNotIn("未填 similarity", out)
+
+    def test_missing_sources_warns(self):
+        """缺 sources 就无法追溯来源页面，不能静默放行。"""
+        cand = {"candidates": [_cand("甲书")]}
+        code, out = self.run_main(cand, _profile(), "--check")
+        self.assertIn("未填 sources", out)
+
+    def test_sources_carried_to_json(self):
+        cand = {"candidates": [_cand("甲书", sources=["https://example.com/a"])]}
+        code, out = self.run_main(cand, _profile(), "--json")
+        payload = json.loads(out)
+        self.assertEqual(payload["results"][0]["sources"], ["https://example.com/a"])
+
+    def test_same_book_across_platform_merged(self):
+        """同一本书一条可读、一条下架时，不得在主榜和延伸参考各出现一次。"""
+        cand = {
+            "candidates": [
+                _cand("太空垃圾佬", sources=["u"]),
+                _cand(
+                    "巨企、殖民地与星舰",
+                    aliases=["太空垃圾佬"],
+                    platform_match="none",
+                    sources=["u"],
+                ),
+            ]
+        }
+        code, out = self.run_main(cand, _profile(), "--json")
+        payload = json.loads(out)
+        self.assertEqual(payload["count"] + len(payload["inaccessible"]), 1, "同一本书只应保留一条")
+        self.assertEqual(len(payload["merged_duplicates"]), 1)
+
+    def test_region_whitespace_normalized(self):
+        """背景只差一个空格时不能被当成两个地区，否则分散上限形同虚设。"""
+        cand = {
+            "candidates": [
+                _cand("A", region="日本战国", sources=["u"]),
+                _cand("B", region="日本 战国", sources=["u"]),
+                _cand("C", region="日本战国", sources=["u"]),
+            ]
+        }
+        code, out = self.run_main(cand, _profile(region_cap=2), "--json")
+        payload = json.loads(out)
+        self.assertEqual(payload["count"], 2)
+        self.assertEqual(len(payload["held_by_region"]), 1)
+
+    def test_region_fullwidth_normalized(self):
+        self.assertEqual(rn._norm_region("日本 战国"), rn._norm_region("日本战国"))
+        self.assertEqual(rn._norm_region("ＷＷＩＩ"), rn._norm_region("wwii"))
+        self.assertEqual(rn._norm_region("  二战德国 "), "二战德国")
+
+    def test_note_length_relaxed(self):
+        """偏好摘要属于长文本，1000 字以内不应被当成脏数据拒绝。"""
+        cand = {"candidates": [_cand("书", note="注" * 900, sources=["u"])]}
+        code, out = self.run_main(cand, _profile(), "--check")
+        self.assertEqual(code, 0, out)
+
+        cand_long = {"candidates": [_cand("书", note="注" * 1001, sources=["u"])]}
+        code, out = self.run_main(cand_long, _profile(), "--check")
+        self.assertEqual(code, 2)
+        self.assertIn("超过", out)
+
+    def test_sub_tag_over_denominator_warns(self):
+        cand = {"candidates": [_cand("书", sub_tag_hits=9, tag_denominator=3, sources=["u"])]}
+        code, out = self.run_main(cand, _profile(), "--check")
+        self.assertEqual(code, 0)
+        self.assertIn("大于标签总数", out)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

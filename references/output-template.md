@@ -64,7 +64,7 @@
 | has_reference_work | bool | 用户是否给了参考作品。false 时相似度不进分母，总分按 80 分制归一化到 100 |
 | tag_denominator | int | 可选。画像里的细分标签总数，用于把命中数按比例折算成题材分。缺省时按"每命中 1 个加 4 分"计 |
 | region_cap | int | 可选。同一地理/时代背景最多保留几本，默认 3。设 0 关闭主题分散；填 null 或不填则用默认值 3 |
-| note | string | 偏好摘要，仅用于输出抬头，不参与计算 |
+| note | string | 偏好摘要，仅用于输出抬头，不参与计算。上限 1000 字符 |
 
 **单位是「万字」，不是「字」。** 210 万字请填 `210` 而不是 `2100000`。填成后者脚本会直接报错——超过 5000 万的数值一律判定为单位填错并拒绝，不会静默扣满分篇幅分。
 
@@ -88,6 +88,7 @@
       "status": "active",
       "region": "日本战国",
       "aliases": ["别译名"],
+      "sources": ["https://www.qidian.com/book/xxxx/", "https://book.douban.com/subject/xxxx/"],
       "note": "补充说明"
     }
   ]
@@ -109,8 +110,9 @@
 | status | string | active / read / rejected / excluded | 默认 active。脚本只对 active 排序，其余剔除并按类别报数量 |
 | region | string | 如「日本战国」「二战德国」 | 地理或时代背景，用于主题分散。留空则不受分散约束 |
 | aliases | string[] | 别名/异译名 | 用于同名合并，与 title 一并参与归一化判重。**支持链式**：A、B(别名A)、C(别名B) 会合并成一条 |
+| sources | string[] | 来源页面链接 | **每部候选都应填**。检索时实际打开或看到的页面，多个来源全部列出。缺填时 `--check` 报警，输出时该作品按规则标「来源不明」 |
 | already_read | bool | true/false | **旧字段，已废弃**。仅在没写 status 时生效（为 true 等价于 `status: "read"`）。与 status 同时出现且冲突时脚本报错，不会静默覆盖 |
-| author / note | string | — | 可选。类型不对会报错，不会把 JSON 对象直接塞进输出 |
+| author / note | string | — | 可选。类型不对会报错，不会把 JSON 对象直接塞进输出。note 上限 1000 字符 |
 
 **数值不能是 NaN / Infinity。** 这是非标准 JSON 字面量，脚本会拒绝并提示，不会让 `nan` 混进最终分数。
 
@@ -162,7 +164,9 @@ python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./
 
 被剔除的作品都单列报回，不静默丢弃，需要时可以直接替换回主清单。
 
-`--json` 的完整字段：`profile_note`、`has_reference_work`、`dropped`、`auto_filtered_out_of_band`、`inaccessible`、`merged_duplicates`、`held_by_region`、`warnings`、`count`、`results`。其中 `results`、`inaccessible`、`held_by_region` 三处的每一条都带完整 `breakdown`，字段结构一致，可以直接拼在一起做下游加工。
+**处理顺序固定**：status 剔除 → 打分排序 → 篇幅过滤 → 同名合并 → 可及性拆分 → 主题分散。同名合并排在可及性拆分之前，所以同一本书不会在主榜和延伸参考里各出现一次。
+
+`--json` 的完整字段：`profile_note`、`has_reference_work`、`dropped`、`auto_filtered_out_of_band`、`inaccessible`、`merged_duplicates`、`held_by_region`、`warnings`、`count`、`results`。其中 `results`、`inaccessible`、`held_by_region` 三处的每一条都带完整 `breakdown` 和 `sources`，字段结构一致，可以直接拼在一起做下游加工。
 
 ### 输出示例
 
