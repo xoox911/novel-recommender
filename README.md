@@ -45,7 +45,7 @@
 或用 Git 直接克隆：
 
 ```bash
-git clone https://github.com/<your-name>/novel-recommender.git ~/.workbuddy/skills/novel-recommender
+git clone https://github.com/XOOX911/novel-recommender.git ~/.workbuddy/skills/novel-recommender
 ```
 
 也可以从 [Releases](../../releases) 下载 zip 解压。
