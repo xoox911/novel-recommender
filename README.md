@@ -143,6 +143,7 @@ python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./
 ```
 novel-recommender/
 ├── SKILL.md                           六阶段主流程 + 多轮修正协议
+├── CONTRIBUTING.md                    改代码、跑测试、发版
 ├── references/
 │   ├── preference-taxonomy.md         题材标签体系、雷点清单、篇幅分档
 │   ├── platform-guide.md              四平台必检规则、检索词构造
@@ -160,30 +161,7 @@ novel-recommender/
 
 **运行要求**：Python 3.10+，**零第三方依赖**（只用标准库）。不需要 pip install 任何东西。
 
-## 开发与测试
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-33 个用例覆盖打分模型、字段校验、别名合并、主题分散、硬过滤和各类异常输入。改脚本前后都跑一遍。
-
-## 发版
-
-**只 push commit 不会更新 Releases 面板**——那里只列打过 tag 的发行版。所以每次发版必须做三步，缺一步都会出现「代码更新了但版本号没动」：
-
-```bash
-# 1. 改 pyproject.toml 里的 version 字段
-# 2. 打 tag 并推送
-git tag v1.0.2
-git push origin v1.0.2
-# 3. 基于该 tag 建 release（有 gh CLI 的话一条命令搞定）
-gh release create v1.0.2 --generate-notes
-```
-
-没有 gh CLI 就在 GitHub 网页的 Releases 页面点「Draft a new release」，选刚推的 tag。新 release 会自动拿「Latest」标记，旧版本退位。
-
-版本号要同时体现在两处：`pyproject.toml` 的 `version` 字段，和 git tag。两处不一致会造成「装的版本」和「显示的版本」对不上。
+自带 33 个回归用例，覆盖打分模型、字段校验、别名合并、主题分散和各类异常输入。要改代码、跑测试或者自己发版，看 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 已知局限
 
