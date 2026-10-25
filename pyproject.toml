@@ -1,0 +1,22 @@
+[project]
+name = "novel-recommender"
+version = "0.2.0"
+description = "按口味推荐中文网络小说的 Agent Skill：六维加权打分、同名合并、主题分散"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/xoox911/novel-recommender"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

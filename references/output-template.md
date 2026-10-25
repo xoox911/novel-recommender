@@ -63,8 +63,10 @@
 | target_word_max | number | 目标字数上限，单位万字。null 表示不限 |
 | has_reference_work | bool | 用户是否给了参考作品。false 时相似度不进分母，总分按 80 分制归一化到 100 |
 | tag_denominator | int | 可选。画像里的细分标签总数，用于把命中数按比例折算成题材分。缺省时按"每命中 1 个加 4 分"计 |
-| region_cap | int | 可选。同一地理/时代背景最多保留几本，默认 3。设 0 关闭主题分散 |
+| region_cap | int | 可选。同一地理/时代背景最多保留几本，默认 3。设 0 关闭主题分散；填 null 或不填则用默认值 3 |
 | note | string | 偏好摘要，仅用于输出抬头，不参与计算 |
+
+**单位是「万字」，不是「字」。** 210 万字请填 `210` 而不是 `2100000`。填成后者脚本会直接报错——超过 5000 万的数值一律判定为单位填错并拒绝，不会静默扣满分篇幅分。
 
 ### candidates.json
 
@@ -94,19 +96,23 @@
 
 | 字段 | 类型 | 取值 | 说明 |
 |---|---|---|---|
-| main_genre_match | bool | true/false | 主类型是否命中，必填 |
+| title | string | — | 书名，必填。不可见控制字符（含 ANSI 转义）会被自动剥除，上限 200 字符 |
+| main_genre_match | bool | true/false | 主类型是否命中，必填。**为 false 时题材分封顶 20**，哪怕子标签全中 |
 | sub_tag_hits | int | ≥0 | 作品标签与画像细分标签的交集个数。给了 tag_denominator 时按 hits ÷ denominator 折算题材分 |
 | tag_denominator | int | ≥1 | 可选。覆盖 profile 里的同名值，用于本条单独指定标签总数 |
 | similarity | number | 0–20 | 与参考作品的相似度，has_reference_work 为 false 时忽略 |
-| word_count | number \| null | 万字 | 总字数。未知填 null，脚本会提示需标「信息不全」，不计入篇幅扣分告警 |
-| platform_match | string | primary / secondary / none | 渠道可及性，**大小写敏感** |
+| word_count | number \| null | 万字 | 总字数，**单位万字**。未知填 null，脚本会提示需标「信息不全」，且不参与篇幅硬过滤。超过 5000 视为单位填错，直接报错 |
+| platform_match | string | primary / secondary / none | 渠道可及性，**大小写敏感**。填 none 的作品会被移出主榜、单列为延伸参考 |
 | update_match | string | exact / acceptable / mismatch | 完结状态匹配度，**大小写敏感** |
 | reputation | string | 见下表六档 | 舆论质量，**不是讨论热度** |
 | credibility | string | verified / pending / incomplete / unknown | 对应四档标注，脚本仅原样带回 |
 | status | string | active / read / rejected / excluded | 默认 active。脚本只对 active 排序，其余剔除并按类别报数量 |
 | region | string | 如「日本战国」「二战德国」 | 地理或时代背景，用于主题分散。留空则不受分散约束 |
-| aliases | string[] | 别名/异译名 | 用于同名合并，与 title 一并参与归一化判重 |
-| already_read | bool | true/false | 旧字段，为兼容保留。为 true 时等价于 `status: "read"`，优先于 status 生效 |
+| aliases | string[] | 别名/异译名 | 用于同名合并，与 title 一并参与归一化判重。**支持链式**：A、B(别名A)、C(别名B) 会合并成一条 |
+| already_read | bool | true/false | **旧字段，已废弃**。仅在没写 status 时生效（为 true 等价于 `status: "read"`）。与 status 同时出现且冲突时脚本报错，不会静默覆盖 |
+| author / note | string | — | 可选。类型不对会报错，不会把 JSON 对象直接塞进输出 |
+
+**数值不能是 NaN / Infinity。** 这是非标准 JSON 字面量，脚本会拒绝并提示，不会让 `nan` 混进最终分数。
 
 字段类型或枚举值写错时，脚本报错退出（退出码 2），一次性列出所有问题候选及具体字段，**不会静默按 0 分处理**。
 
@@ -128,13 +134,35 @@
 ### 调用
 
 ```bash
+# 逐批补录时先校验，不排序
+python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --check
+
+# 出表格
 python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json
+
+# 出结构化 JSON
 python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --json
 ```
 
 `<skill_dir>` 替换为 skill 实际所在目录。JSON 写到当前工作目录即可，不要依赖脚本的 cwd。
 
-`--json` 输出结构化结果，便于后续加工；不带参数时输出可读表格。
+- `--check` — 只校验字段不排序。候选是分批补录的，填到第 20 部才发现第 7 部写错会整体重来，逐批验证更省事
+- `--json` — 输出结构化结果，便于后续加工
+- 不带参数 — 输出可读表格
+
+### 脚本会自己做的三件事
+
+不需要手工标记，也**不要**手动把这些候选删掉：
+
+| 行为 | 触发条件 | 输出字段 |
+|---|---|---|
+| 篇幅硬过滤 | `word_count` 已知且超出目标区间上下 30% | `auto_filtered_out_of_band` |
+| 可及性硬过滤 | `platform_match: "none"` | `inaccessible` |
+| 同名合并 | title / aliases 归一化后重复 | `merged_duplicates` |
+
+被剔除的作品都单列报回，不静默丢弃，需要时可以直接替换回主清单。
+
+`--json` 的完整字段：`profile_note`、`has_reference_work`、`dropped`、`auto_filtered_out_of_band`、`inaccessible`、`merged_duplicates`、`held_by_region`、`warnings`、`count`、`results`。其中 `results`、`inaccessible`、`held_by_region` 三处的每一条都带完整 `breakdown`，字段结构一致，可以直接拼在一起做下游加工。
 
 ### 输出示例
 

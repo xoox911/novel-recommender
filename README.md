@@ -29,7 +29,7 @@
 
 ## 核心能力
 
-- **结构化访谈**：首轮 5 项（题材、结构偏好、当前状态、篇幅、雷点），二轮按条件追问，避免一次抛十几个问题
+- **结构化访谈**：首轮 6 项（题材、结构偏好、当前状态、篇幅、雷点、已读去重），二轮按条件追问，避免一次性抛十几个问题
 - **四平台必检**：按男频/女频 × 付费/免费 覆盖，检索词必须带平台名前缀，防止被起点系内容垄断
 - **四道硬过滤**：已读去重 → 雷点 → 篇幅 → 渠道可及性
 - **六维加权打分**：题材 30、相似度 20、篇幅 15、平台 15、舆论 15、更新状态 5
@@ -51,7 +51,7 @@
 或用 Git 直接克隆：
 
 ```bash
-git clone https://github.com/XOOX911/novel-recommender.git ~/.workbuddy/skills/novel-recommender
+git clone https://github.com/xoox911/novel-recommender.git ~/.workbuddy/skills/novel-recommender
 ```
 
 也可以从 [Releases](../../releases) 下载 zip 解压。
@@ -64,7 +64,7 @@ git clone https://github.com/XOOX911/novel-recommender.git ~/.workbuddy/skills/n
 
 > 书荒了，帮我找本小说
 
-它会先问 4-5 个问题，再出清单。
+它会先问 6 个问题（可跳过任意一项），再出清单。
 
 **带明确偏好：**
 
@@ -96,10 +96,14 @@ git clone https://github.com/XOOX911/novel-recommender.git ~/.workbuddy/skills/n
 打分由 `scripts/rank_novels.py` 执行，不靠模型心算。同一份输入每次输出一致。
 
 ```bash
-python scripts/rank_novels.py candidates.json --profile profile.json
+# 先校验输入，再排序（推荐）
+python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --check
+python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json
 ```
 
-脚本会校验所有字段类型与枚举值，写错时报错退出并指明具体是哪一部候选的哪个字段，不会静默按 0 分处理。
+`<skill_dir>` 换成 skill 装在哪（如 `~/.workbuddy/skills/novel-recommender`）。**别用相对路径**——你的当前目录通常不是 skill 目录，直接写 `scripts/rank_novels.py` 会报找不到文件。
+
+脚本会校验所有字段类型与枚举值，写错时报错退出并指明具体是哪一部候选的哪个字段，不会静默按 0 分处理。篇幅超区间和纯实体/已下架的作品由脚本自动剔出主榜（分别列入「篇幅超区间」和「延伸参考」），不需要手工标记。
 
 ## 目录结构
 
@@ -111,13 +115,25 @@ novel-recommender/
 │   ├── platform-guide.md              四平台必检规则、检索词构造
 │   ├── source-credibility.md          四档可信度、营销号识别、争议分类
 │   └── output-template.md             输出模板与脚本 JSON 格式
-└── scripts/
-    └── rank_novels.py                 加权打分、同名合并、主题分散
+├── scripts/
+│   └── rank_novels.py                 加权打分、同名合并、主题分散、硬过滤
+└── tests/
+    └── test_rank_novels.py            31 个回归用例，标准库 unittest
 ```
 
 ## 兼容性
 
-`SKILL.md` 的 frontmatter 只有 `name` / `description` / `agent_created` 三个字段，不依赖任何私有扩展。理论上任何支持 Agent Skills 规范的工具都能加载。已在 WorkBuddy 上实测。
+`SKILL.md` 的 frontmatter 只有 `name` / `description` / `agent_created` 三个字段。`agent_created` 是 WorkBuddy 写入的标记，其他工具会忽略，不影响加载。已在 WorkBuddy 上实测。
+
+**运行要求**：Python 3.10+，**零第三方依赖**（只用标准库）。不需要 pip install 任何东西。
+
+## 开发与测试
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+31 个用例覆盖打分模型、字段校验、别名合并、主题分散、硬过滤和各类异常输入。改脚本前后都跑一遍。
 
 ## 已知局限
 
