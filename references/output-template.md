@@ -2,7 +2,7 @@
 
 ## 一、推荐清单输出模板
 
-开头三行总体说明，然后逐部列出。
+开头三行总体说明，然后按数量分两层输出（规则见第三节）。5 部及以下全部展开成详情卡：
 
 ```
 按「<核心偏好摘要>」筛出 <N> 部，已排除 <雷点摘要>。按匹配度降序，分数由题材契合、篇幅、平台可及性、口碑加权得出。
@@ -34,15 +34,20 @@
 | 免费情况 | "应该免费" | 四种标准表述之一，不确定则标"待核实" |
 | 链接 | 首页链接 | 具体作品页链接 |
 
-## 三、多部作品的紧凑列表形式
+## 三、两层输出：速览表 + 详情卡
 
-作品超过 5 部时，先给一张速览表，再展开前 3 部的详情：
+数量决定展开到哪一层，不要每部都写满详情：
+
+- **5 部及以下** → 全部展开成详情卡（结构见第一节）
+- **6 部及以上** → 先给全量速览表，再只把前 3 名展开成详情卡，第 4 名往后只保留表内一行
 
 ```
 | # | 书名 | 作者 | 标签 | 平台 | 免费情况 | 匹配度 | 可信度 |
 |---|------|------|------|------|----------|--------|--------|
 | 1 | ... | ... | ... | 起点 | 部分免费 | 87 | 已核实 |
 ```
+
+表后另起两行，各占一行不展开：因主题重复暂缓的作品（附 region 与分数）、被合并掉的异译重复。
 
 ## 四、rank_novels.py 输入格式
 
@@ -70,8 +75,13 @@
 
 ### candidates.json
 
+顶层可以是 `{"candidates": [...]}` 或直接为数组。推荐用前一种，并在同一层维护 `searches` 记录本轮已跑过的检索（脚本只读 `candidates`，`searches` 不参与计算）：
+
 ```json
 {
+  "searches": [
+    {"query": "番茄小说 星际 群像 无CP", "platform": "番茄", "leads": 6, "round": 1}
+  ],
   "candidates": [
     {
       "title": "书名",
@@ -118,16 +128,7 @@
 
 字段类型或枚举值写错时，脚本报错退出（退出码 2），一次性列出所有问题候选及具体字段，**不会静默按 0 分处理**。
 
-`reputation` 六档取值（满分 15）：
-
-| 取值 | 含义 | 分 |
-|---|---|---|
-| strong_positive | 多来源正面 + 讨论量大 | 15 |
-| positive_quiet | 多来源正面 + 讨论少 | 11 |
-| polarized_style | 两极分化，争议在口味 | 9 |
-| polarized_flaw | 两极分化，争议在硬伤 | 5 |
-| single_source | 单一来源 / 只有官方推荐语 | 4 |
-| mostly_negative | 负面为主 | 2 |
+`reputation` 六档取值与分值以 `SKILL.md` 阶段五「舆论质量六档细则」为唯一口径，本文件不复述，避免两处分值不一致。判定由检索阶段完成，脚本只接收结果。
 
 `main_genre_match` 是必填项；`similarity` 在无参考作品时可省略或填 0；批量补录时直接往 `candidates` 数组追加即可。
 
@@ -139,8 +140,8 @@
 # 逐批补录时先校验，不排序
 python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --check
 
-# 出表格
-python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json
+# 出表格（按本轮档位传目标产出：标准 10 / 精简 8 / 最小 5）
+python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --target-count 8
 
 # 出结构化 JSON
 python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./novel-profile.json --json
@@ -149,6 +150,7 @@ python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./
 `<skill_dir>` 替换为 skill 实际所在目录。JSON 写到当前工作目录即可，不要依赖脚本的 cwd。
 
 - `--check` — 只校验字段不排序。候选是分批补录的，填到第 20 部才发现第 7 部写错会整体重来，逐批验证更省事
+- `--target-count` — 本轮目标产出数，低于该值才提示回补。不传按 10 计
 - `--json` — 输出结构化结果，便于后续加工
 - 不带参数 — 输出可读表格
 
@@ -167,6 +169,8 @@ python "<skill_dir>/scripts/rank_novels.py" ./novel-candidates.json --profile ./
 **处理顺序固定**：status 剔除 → 打分排序 → 篇幅过滤 → 同名合并 → 可及性拆分 → 主题分散。同名合并排在可及性拆分之前，所以同一本书不会在主榜和延伸参考里各出现一次。
 
 `--json` 的完整字段：`profile_note`、`has_reference_work`、`dropped`、`auto_filtered_out_of_band`、`inaccessible`、`merged_duplicates`、`held_by_region`、`warnings`、`count`、`results`。其中 `results`、`inaccessible`、`held_by_region` 三处的每一条都带完整 `breakdown` 和 `sources`，字段结构一致，可以直接拼在一起做下游加工。
+
+`breakdown` 里除六维明细外还有一个 `score_without_platform`：不含平台可及性分的总分。延伸参考里的作品 `platform_match` 为 `none`，正常 `score` 会被扣掉 15 分，展示时用这个值，避免用户把"读不到"误读成"质量差"。
 
 ### 输出示例
 

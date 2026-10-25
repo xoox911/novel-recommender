@@ -41,7 +41,7 @@ LENGTH_PARTIAL_SCORE = 8  # 落在目标区间外 30% 以内给的分
 LENGTH_BAND_LOW = 0.7  # 下限 × 0.7
 LENGTH_BAND_HIGH = 1.3  # 上限 × 1.3
 
-MIN_RECOMMEND_COUNT = 10  # 低于此数量要提示回补检索
+MIN_RECOMMEND_COUNT = 10  # 默认目标产出数；不同预算档位用 --target-count 覆盖
 WORD_COUNT_MAX_PLAUSIBLE = 5000  # 万字。单本网文超过这个量级基本是单位填错
 TEXT_MAX_LEN = 200  # 书名、作者、标签、背景等短字段上限，防脏数据
 NOTE_MAX_LEN = 1000  # 备注与偏好摘要：用户原话容易被截断，单独放宽
@@ -452,6 +452,9 @@ def score_candidate(item, profile):
         "platform": platform,
         "update": update,
         "reputation": reputation,
+        # 延伸参考里的作品 platform_match 为 none，总分会被扣掉 15 分。
+        # 展示时用不含平台分的分数，避免用户把"读不到"误读成"质量差"。
+        "score_without_platform": round((raw - platform) / full * 100, 1) if full else 0.0,
     }
     return detail, score
 
@@ -594,6 +597,7 @@ def print_table(
     inaccessible=None,
     auto_dropped=None,
     warnings=None,
+    target_count=MIN_RECOMMEND_COUNT,
 ):
     dup_alias = dup_alias or []
     held = held or []
@@ -606,12 +610,13 @@ def print_table(
     if head:
         print(f"偏好摘要：{head}")
     print(f"排序结果（共 {len(results)} 部，按匹配度降序）")
-    counts = dict(dropped)
+    # 人工标记的剔除与脚本自动剔除分开报数：混成一个数字会让执行者
+    # 分不清是自己标错了 status，还是字数确实越界。
+    parts = [f"{STATUS_LABEL[k]} {v} 部" for k, v in dict(dropped).items()]
     if auto_dropped:
-        counts["excluded"] = counts.get("excluded", 0) + len(auto_dropped)
-    if counts:
-        detail = "、".join(f"{STATUS_LABEL[k]} {v} 部" for k, v in counts.items())
-        print(f"已剔除：{detail}")
+        parts.append(f"篇幅越界自动剔除 {len(auto_dropped)} 部")
+    if parts:
+        print("已剔除：" + "、".join(parts))
     if not profile["has_reference_work"]:
         print("说明：未提供参考作品，相似度维度不计分，总分按 80 分制归一化到 100")
     print()
@@ -667,7 +672,11 @@ def print_table(
     if inaccessible:
         print("当前可用平台无法阅读，已移出主清单，作延伸参考不计入推荐数量：")
         for r in inaccessible:
-            print(f"  - {r['item']['title']}（{r['score']} 分，需换平台或仅实体/已下架）")
+            print(
+                f"  - {r['item']['title']}"
+                f"（{r['detail']['score_without_platform']} 分，未计平台可及性；"
+                f"需换平台或仅实体/已下架）"
+            )
 
     pending = [r for r in results if r["item"]["credibility"] != "verified"]
     if pending:
@@ -675,9 +684,9 @@ def print_table(
         for r in pending:
             print(f"  - {r['item']['title']}：{CREDIBILITY_LABEL[r['item']['credibility']]}")
 
-    if len(results) < MIN_RECOMMEND_COUNT:
+    if len(results) < target_count:
         print(
-            f"警告：仅 {len(results)} 部，低于 {MIN_RECOMMEND_COUNT} 部下限。"
+            f"警告：仅 {len(results)} 部，低于本轮目标 {target_count} 部。"
             f"按 SKILL.md 规则应回补检索，最多 2 轮；仍不足则在输出开头说明缺口与原因。"
         )
 
@@ -727,7 +736,16 @@ def main():
     parser.add_argument("--profile", required=True, help="偏好画像 JSON 文件路径")
     parser.add_argument("--json", action="store_true", help="输出结构化 JSON 而非表格")
     parser.add_argument("--check", action="store_true", help="只校验输入不排序，便于边填边验")
+    parser.add_argument(
+        "--target-count",
+        type=int,
+        default=MIN_RECOMMEND_COUNT,
+        help=f"本轮目标产出数，低于该值时提示回补检索。默认 {MIN_RECOMMEND_COUNT}",
+    )
     args = parser.parse_args()
+    if args.target_count < 1:
+        print(f"错误：--target-count 必须是正整数，实际为 {args.target_count}")
+        return 2
 
     cand_path = Path(args.candidates)
     prof_path = Path(args.profile)
@@ -854,7 +872,15 @@ def main():
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print_table(
-            results, profile, dropped, dup_alias, held, inaccessible, auto_dropped, warnings
+            results,
+            profile,
+            dropped,
+            dup_alias,
+            held,
+            inaccessible,
+            auto_dropped,
+            warnings,
+            target_count=args.target_count,
         )
 
     return 0

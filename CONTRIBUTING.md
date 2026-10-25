@@ -34,13 +34,15 @@ ruff format --check scripts tests
 
 **规则别写进代码。** 什么算"两极分化"、什么情况标"待核实"，这些判断由 AI 在检索阶段做，脚本只接收判定好的结果。把规则硬编码进 Python，改一次要发一次版。
 
-## 三处必须同步的地方
+## 必须同步的地方
 
-改打分权重的时候，这三处一起改，漏一处就自相矛盾：
+改打分权重或枚举取值时，这三处一起改，漏一处就自相矛盾：
 
 1. `scripts/rank_novels.py` 顶部的 `W_GENRE` / `W_SIMILARITY` 等常量
-2. `SKILL.md` 阶段五的权重表
-3. `references/output-template.md` 的字段说明
+2. `SKILL.md` 阶段五的权重表与六档细则
+3. `README.md` 的打分模型表
+
+`tests/test_docs_consistency.py` 会自动比对这三处，漏改直接测试失败，不用靠人眼核对。`references/output-template.md` 与 README 的口碑考核只保留指针、不复制分值，所以不需要额外同步。
 
 同理，新增候选字段时：脚本的 `validate_candidate`、`output-template.md` 的字段表、`SKILL.md` 的相关段落，三处都要补，否则 AI 不知道该怎么填。
 

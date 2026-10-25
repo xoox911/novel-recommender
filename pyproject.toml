@@ -1,6 +1,6 @@
 [project]
 name = "novel-recommender"
-version = "1.1.2"
+version = "1.2.0"
 description = "按口味推荐中文网络小说的 Agent Skill：六维加权打分、同名合并、主题分散"
 readme = "README.md"
 requires-python = ">=3.10"

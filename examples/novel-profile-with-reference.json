@@ -1,0 +1,8 @@
+{
+  "target_word_min": 100,
+  "target_word_max": 300,
+  "has_reference_work": true,
+  "tag_denominator": 4,
+  "region_cap": 2,
+  "note": "类似《战争与和平》的通俗版：外国历史/军事、群像、无感情线主线"
+}
