@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/xoox911/novel-recommender/actions/workflows/tests.yml/badge.svg)](https://github.com/xoox911/novel-recommender/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![version](https://img.shields.io/badge/version-1.0.2-blue)](https://github.com/xoox911/novel-recommender/releases)
+[![version](https://img.shields.io/badge/version-1.1.1-blue)](https://github.com/xoox911/novel-recommender/releases)
 
 > 让 AI 按你的口味挑中文网络小说，并且告诉你每本书有什么坑。
 
@@ -177,6 +177,7 @@ novel-recommender/
 ├── README.md                          本文件
 ├── CONTRIBUTING.md                    改代码、跑测试、发版
 ├── LICENSE                            MIT
+├── SECURITY.md                        安全问题往哪报、什么在范围内
 ├── pyproject.toml                     版本号与 ruff 配置
 ├── references/
 │   ├── preference-taxonomy.md         题材标签体系、雷点清单、篇幅分档
@@ -218,6 +219,8 @@ novel-recommender/
 - **舆论判断有主观成分**。六档分档由执行者判定，不是算法结果；同一本书不同人可能判到相邻两档。
 - **部分链接要你自己点一下**。标「待核实」的作品，字数与状态来自二手来源，没逐个打开作品页。
 - **中文描述才稳**。用英文提问时，触发率可能偏低。
+- **不做缓存，同一偏好两次问可能给不同的书**。每次推荐都重新检索，结果取决于当次搜到什么，不是固定榜单。
+- **小众偏好可能凑不满 10 部**。宁可少给也不拿不合口味的书凑数，输出开头会说明缺口和原因。
 
 ## 合规
 
