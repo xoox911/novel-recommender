@@ -6,6 +6,9 @@ dist/
 __pycache__/
 *.py[cod]
 .venv/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
 
 # 测试与临时文件
 *.log
