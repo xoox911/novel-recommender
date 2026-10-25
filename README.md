@@ -118,7 +118,7 @@ novel-recommender/
 ├── scripts/
 │   └── rank_novels.py                 加权打分、同名合并、主题分散、硬过滤
 └── tests/
-    └── test_rank_novels.py            31 个回归用例，标准库 unittest
+    └── test_rank_novels.py            33 个回归用例，标准库 unittest
 ```
 
 ## 兼容性
@@ -133,7 +133,24 @@ novel-recommender/
 python -m unittest discover -s tests -v
 ```
 
-31 个用例覆盖打分模型、字段校验、别名合并、主题分散、硬过滤和各类异常输入。改脚本前后都跑一遍。
+33 个用例覆盖打分模型、字段校验、别名合并、主题分散、硬过滤和各类异常输入。改脚本前后都跑一遍。
+
+## 发版
+
+**只 push commit 不会更新 Releases 面板**——那里只列打过 tag 的发行版。所以每次发版必须做三步，缺一步都会出现「代码更新了但版本号没动」：
+
+```bash
+# 1. 改 pyproject.toml 里的 version 字段
+# 2. 打 tag 并推送
+git tag v1.0.2
+git push origin v1.0.2
+# 3. 基于该 tag 建 release（有 gh CLI 的话一条命令搞定）
+gh release create v1.0.2 --generate-notes
+```
+
+没有 gh CLI 就在 GitHub 网页的 Releases 页面点「Draft a new release」，选刚推的 tag。新 release 会自动拿「Latest」标记，旧版本退位。
+
+版本号要同时体现在两处：`pyproject.toml` 的 `version` 字段，和 git tag。两处不一致会造成「装的版本」和「显示的版本」对不上。
 
 ## 已知局限
 
