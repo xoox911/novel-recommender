@@ -46,22 +46,52 @@ ruff format --check scripts tests
 
 ## 发版
 
-**只 push commit 不会更新 Releases 面板**——那里只列打过 tag 的发行版。所以每次发版必须做三步，缺一步都会出现「代码更新了但版本号没动」：
+**只 push commit 不会更新 Releases 面板**——那里只列打过 tag 的发行版。发版要做四步，缺一步都会出问题：
 
 ```bash
-# 1. 改 pyproject.toml 里的 version 字段
+# 1. 改版本号（两处，见下）
 # 2. 打 tag 并推送
 git tag v1.0.2
 git push origin v1.0.2
-# 3. 基于该 tag 建 release（有 gh CLI 的话一条命令搞定）
-gh release create v1.0.2 --generate-notes
+# 3. 打包 skill 目录成 zip
+# 4. 建 release，并把 zip 作为附件传上去
+gh release create v1.0.2 novel-recommender.zip --title "v1.0.2 <一句话说明>" --generate-notes
 ```
 
-没有 gh CLI 就在网页的 Releases 页面点「Draft a new release」，选刚推的 tag。新 release 会自动拿「Latest」标记，旧版本退位。
+没有 gh CLI 就在网页点「Draft a new release」，选刚推的 tag，**在附件区手动拖入 zip**，再发布。
 
-版本号要在两处保持一致：`pyproject.toml` 的 `version` 字段，和 git tag。两处不一致会造成「装的版本」和「显示的版本」对不上。
+### 版本号要改两处
+
+`pyproject.toml` 的 `version`，和 `SKILL.md` frontmatter 的 `version`。加上 git tag，一共三处必须一致——漏掉 SKILL.md 会出现「装的版本」和「skill 里写的版本」对不上，用户没法自查。
+
+### 必须传 zip 附件
+
+`--generate-notes` 不会自动生成附件，不传 zip 的话 README 里「从 Releases 下载 zip」就落空，用户只能拿 Source code（多一层 `novel-recommender-1.0.2/` 目录，解压后不能直接用）。
+
+zip 里的顶层目录必须叫 `novel-recommender`，解压即可用。
+
+Windows（PowerShell，在仓库根目录执行）：
+
+```powershell
+Compress-Archive -Path novel-recommender -DestinationPath novel-recommender.zip -Force
+```
+
+macOS / Linux：
+
+```bash
+zip -r novel-recommender.zip novel-recommender -x "novel-recommender/.git/*"
+```
+
+仓库根目录本身就叫 `novel-recommender`，所以在**它的上一级**执行才打包出正确结构。打完先解压验一遍：打开 zip 应先看到一个 `novel-recommender` 文件夹，点进去直接是 `SKILL.md`。
+
+### 发完核对三件事
+
+1. Releases 页面最新那条带 `novel-recommender.zip` 附件
+2. 下载解压后 `SKILL.md` 在第一层，`version` 与 tag 一致
+3. CI 在 tag 上也是绿的
 
 ### 一个踩过的坑
+
 
 **别删已发布的 tag 去重打。** 删除远端 tag 的瞬间，关联的 Release 会掉成 draft，URL 变成 `untagged-<hash>`，`/releases/latest` 退回上一个版本。
 

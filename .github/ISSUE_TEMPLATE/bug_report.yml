@@ -1,0 +1,65 @@
+name: 报告问题
+description: 装不上、触发不了、输出不对
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看两件事，能省一轮沟通：
+        1. 装完没触发过？先在 skill 目录跑 `python -m unittest discover -s tests`，确认是文件不全还是宿主没加载。
+        2. 脚本报错？把完整报错贴进下面的输入框，脚本会指明是哪一部候选的哪个字段。
+  - type: dropdown
+    id: host
+    attributes:
+      label: 用的是哪个工具
+      options:
+        - WorkBuddy
+        - Claude Code
+        - Codex
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      description: 命令行输入 `python --version`，把结果粘过来
+      placeholder: Python 3.12.4
+  - type: textarea
+    id: what
+    attributes:
+      label: 具体现象
+      description: 你说了什么、它回了什么、你期望它做什么。有截图直接拖进来
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从第几步开始不对劲的，按顺序写
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: 报错信息
+      description: 完整粘贴，不要只截最后一行
+      render: shell
+  - type: checkboxes
+    id: check
+    attributes:
+      label: 确认一下
+      options:
+        - label: 我看过 README 的「已知局限」，这不是已经写明的限制
+          required: true

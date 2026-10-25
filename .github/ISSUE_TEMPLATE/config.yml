@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安装与使用问题
+    url: https://github.com/xoox911/novel-recommender#%E5%AE%89%E8%A3%85
+    about: 装之前先看 README 的安装和验证两节，多数问题在那里能解决
